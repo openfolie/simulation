@@ -1,3 +1,7 @@
+def shit():
+    pass
+
+
 def main():
     print("Hello from simulation!")
 
