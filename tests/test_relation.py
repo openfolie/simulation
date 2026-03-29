@@ -1,11 +1,8 @@
 import agents
 
 
-def main():
+def test_relations_crud():
     relations = agents.Relations()
     relations.connect(1, 2, "enemies", 69.0)
-    return
-
-
-if __name__ == "__main__":
-    main()
+    print(dir(relations))
+    assert 1

@@ -8,3 +8,15 @@ dependencies = [
     "mesa>=3.5.1",
     "networkx>=3.6.1",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--ignore=opt",
+]
+pythonpath = ["."]
+

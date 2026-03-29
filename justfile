@@ -3,3 +3,6 @@ dev:
 
 fmt:
   black .
+
+test:
+  uv run pytest
