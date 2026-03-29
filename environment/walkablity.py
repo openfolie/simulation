@@ -37,6 +37,7 @@ class RugidSurface(Walkability):
                 min_height * granuality,
                 max_height * granuality
             ) / granuality, granuality_power)
+
         super().__init__(
             [
                 [level + x(), level + x()],
