@@ -1,0 +1,13 @@
+certifi==2025.4.26
+charset-normalizer==3.4.2
+idna==3.10
+numpy==2.3.1
+pillow==11.3.0
+platformdirs==4.3.8
+pyopencl==2025.2.5
+pytools==2025.1.6
+requests==2.32.4
+siphash24==1.7
+sortedcontainers==2.4.0
+typing_extensions==4.13.2
+urllib3==2.4.0

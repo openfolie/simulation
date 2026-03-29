@@ -1,0 +1,17 @@
+__pycache__/
+test
+venv/
+test.*
+.pypirc
+_*/
+Makefile
+MANIFEST
+dist/
+.coverage
+doc/build/
+*.png
+pynoise.egg-info/*
+.cache/
+build/
+quick.py
+.pypirc

@@ -1,3 +1,8 @@
+parameters used to determine:
+Elevation
+Temperature (Kinda like how equators are on average warmer than poles)
+Rainfall
+
 ## Cold
 Polar (very cold, very dry)
 Tundra (cold, low moisture)

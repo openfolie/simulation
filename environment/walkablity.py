@@ -1,4 +1,3 @@
-from commons.actions import FundamentalActions
 from random import randint
 
 
@@ -33,10 +32,10 @@ class RugidSurface(Walkability):
     def __init__(self, level, min_height, max_height, granuality_power):
         def x():
             granuality = pow(10, granuality_power)
-            return round(randint(
-                min_height * granuality,
-                max_height * granuality
-            ) / granuality, granuality_power)
+            return round(
+                randint(min_height * granuality, max_height * granuality) / granuality,
+                granuality_power,
+            )
 
         super().__init__(
             [

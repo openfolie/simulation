@@ -1,6 +1,11 @@
 import networkx as nx
 
 
+def delkey(x, key):
+    del x[key]
+    return x
+
+
 class Relations:
     def __init__(self):
         self.__graph = nx.Graph()
@@ -15,5 +20,8 @@ class Relations:
         self.__graph.add_edge(a, b, relation=relation, weight=weight)
 
     def get_relation(self, a, relation):
-        pass
-        # self.__graph.
+        return [
+            (v, delkey(data, "relation"))
+            for _, v, data in self.__graph.edges(a, data=True)
+            if data.get("relation") == relation
+        ]

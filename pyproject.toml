@@ -1,13 +1,17 @@
 [project]
 name = "simulation"
 version = "0.1.0"
-description = "Add your description here"
+description = "Simulating the world"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "black>=26.3.1",
+    "mesa",
     "networkx>=3.6.1",
+    "pynoise",
+    "pyopencl>=2026.1.2",
     "seaborn>=0.13.2",
+    "sortedcontainers>=2.4.0",
 ]
 
 [dependency-groups]
@@ -21,3 +25,12 @@ addopts = [
 ]
 pythonpath = ["."]
 
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+pynoise = { workspace = true }
+mesa = { workspace = true }
+
+[tool.setuptools]
+packages = []

@@ -1,9 +1,12 @@
-import agents
+import pyopencl
+
+print(pyopencl.get_platforms())
+
+# from pynoise.noisemodule import Perlin
 
 
 def main():
-    relations = agents.Relations()
-    relations.connect(1, 2, "enemies", 69.0)
+    # noise = Perlin()
     return
 
 
