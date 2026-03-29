@@ -2,7 +2,7 @@ from environment.walkablity import FlatPlain, RugidSurface
 
 
 def test_flatplain():
-    surface = FlatPlain(0)
+    surface = FlatPlain(1)
     for row in surface.slopes:
         for item in row:
             assert item == 1
@@ -12,5 +12,7 @@ def test_flatplain():
 
 
 def test_rugid():
-    surface = RugidSurface(0)
-    print(surface.diffs)
+    surface = RugidSurface(0, -4, 4, 2)
+    for row in surface.slopes:
+        for item in row:
+            assert -4 <= item <= 4

@@ -12,7 +12,6 @@ class Walkability:
             for j in range(len(slopes[0])):
                 self.diffs[i][j] = slope[j] - old[j]
             old = slope
-        print(self.diffs)
 
 
 class FlatPlain(Walkability):
@@ -31,9 +30,13 @@ class FlatPlain(Walkability):
 
 
 class RugidSurface(Walkability):
-    def __init__(self, level, max_height, min_height):
+    def __init__(self, level, min_height, max_height, granuality_power):
         def x():
-            return randint(min_height, max_height)
+            granuality = pow(10, granuality_power)
+            return round(randint(
+                min_height * granuality,
+                max_height * granuality
+            ) / granuality, granuality_power)
         super().__init__(
             [
                 [level + x(), level + x()],
