@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "mesa>=3.5.1",
     "networkx>=3.6.1",
+    "pynoise>=3.0.0",
 ]
 
 [dependency-groups]

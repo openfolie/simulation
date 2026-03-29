@@ -1,8 +1,8 @@
-dev:
-  uv run main.py
+dev *FLAGS:
+  uv run main.py {{FLAGS}}
 
-fmt:
-  black .
+fmt *FLAGS:
+  black . {{FLAGS}}
 
-test:
-  uv run pytest
+test *FLAGS:
+  uv run pytest {{FLAGS}}
