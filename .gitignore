@@ -7,3 +7,5 @@ devenv.local.yaml
 opt
 __pycache__
 .pytest_cache
+.trash
+.obsidian
