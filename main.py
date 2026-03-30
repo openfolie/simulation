@@ -1,13 +1,10 @@
-import pyopencl
-
-print(pyopencl.get_platforms())
-
-# from pynoise.noisemodule import Perlin
+from environment import spaces, winds
 
 
 def main():
-    # noise = Perlin()
-    return
+    maps = spaces.Map((256, 256), False, 400, 2)
+    wind = winds.OnlySouthwardWinds(256, 256)
+    maps.create_biomes(wind)
 
 
 if __name__ == "__main__":
