@@ -2,6 +2,7 @@ import numpy as np
 from math import sin, cos, pi
 from environment.winds import Winds
 from scipy.ndimage import gaussian_filter
+
 # import pygame
 
 
@@ -23,8 +24,7 @@ class Ball:
     def tick(self):
         self.x += self.velocityX * self.DT
         self.y += self.velocityY * self.DT
-        return (0 < self.x < self.world_size[0]) and \
-            (0 < self.y < self.world_size[1])
+        return (0 < self.x < self.world_size[0]) and (0 < self.y < self.world_size[1])
 
     def set_direction(self, direction):
         self.velocityX = cos(direction) * self.SPEED
@@ -36,10 +36,7 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
         return elevation[int(ball.y)][int(ball.x)]
 
     rainfall = np.zeros(elevation.shape)
-    balls = list(map(
-        lambda x: Ball(x, elevation.shape),
-        wind.get_starting_points()
-    ))
+    balls = list(map(lambda x: Ball(x, elevation.shape), wind.get_starting_points()))
     iters = 0
     while iters < 2000:
         if iters % 1000 == 0:

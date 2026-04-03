@@ -1,0 +1,1558 @@
+openapi: 3.1.0
+
+info:
+  title: Civitas Simulation API
+  version: 1.0.0
+  description: |
+    REST API and WebSocket interface for the Civitas agent-based civilization simulator.
+    All simulation state is persistent. Simulations survive server restarts and resume as paused.
+    The WebSocket endpoint streams tick-diff events to connected clients in real time.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: simulations
+    description: Simulation lifecycle — create, start, pause, stop, reset, delete
+  - name: world
+    description: World state reads — full snapshot, tile detail, resource layer
+  - name: agents
+    description: Agent reads — list, detail, memory, plan, action history
+  - name: events
+    description: Event injection — structured events and natural language god-mode commands
+  - name: ablation
+    description: Ablation configuration — toggle cognitive modules per agent or globally
+  - name: replay
+    description: Replay control — list snapshots, seek to tick, activate replay mode
+  - name: stats
+    description: Metrics — token usage, tick durations, agent activity
+
+# ─────────────────────────────────────────
+# Paths
+# ─────────────────────────────────────────
+
+paths:
+
+  # ── Simulations ──────────────────────────────────────────────
+
+  /simulations:
+    get:
+      tags: [simulations]
+      operationId: listSimulations
+      summary: List all simulations
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/SimStatus'
+          description: Filter by status
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of simulations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SimulationSummary'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+
+    post:
+      tags: [simulations]
+      operationId: createSimulation
+      summary: Create a new simulation
+      description: |
+        Validates config, generates the world procedurally from the seed, constructs the Mesa
+        model, persists to SQLite, and returns the simulation id. Does not start the tick loop —
+        call POST /simulations/{id}/start to begin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSimulationRequest'
+      responses:
+        '201':
+          description: Simulation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationDetail'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /simulations/{sim_id}:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+
+    get:
+      tags: [simulations]
+      operationId: getSimulation
+      summary: Get simulation detail
+      responses:
+        '200':
+          description: Simulation detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [simulations]
+      operationId: deleteSimulation
+      summary: Delete a simulation
+      description: |
+        Stops the tick loop if running, removes all SQLite data for this simulation.
+        Irreversible.
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /simulations/{sim_id}/start:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    post:
+      tags: [simulations]
+      operationId: startSimulation
+      summary: Start or resume the tick loop
+      description: |
+        Starts the async tick engine. Valid from status `created` or `paused`.
+        Returns 409 if already running.
+      responses:
+        '200':
+          description: Simulation started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /simulations/{sim_id}/pause:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    post:
+      tags: [simulations]
+      operationId: pauseSimulation
+      summary: Pause the tick loop after the current tick completes
+      description: The current tick finishes before the loop halts. Status becomes `paused`.
+      responses:
+        '200':
+          description: Simulation paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /simulations/{sim_id}/stop:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    post:
+      tags: [simulations]
+      operationId: stopSimulation
+      summary: Stop the simulation permanently
+      description: |
+        Cancels the tick loop immediately (mid-tick if necessary). Status becomes `stopped`.
+        The simulation data is preserved. Can be restarted via /start only from `paused` —
+        a stopped simulation must be reset before restarting.
+      responses:
+        '200':
+          description: Simulation stopped
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /simulations/{sim_id}/reset:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    post:
+      tags: [simulations]
+      operationId: resetSimulation
+      summary: Reset simulation to tick 0
+      description: |
+        Regenerates the world from the original seed and config. Clears all snapshots,
+        action logs, and events. Agent identities are preserved; memory and plans are cleared.
+        Status becomes `created`.
+      responses:
+        '200':
+          description: Simulation reset
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /simulations/{sim_id}/step:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    post:
+      tags: [simulations]
+      operationId: stepSimulation
+      summary: Advance exactly N ticks then pause
+      description: |
+        Runs from `paused` or `created` status. Advances the specified number of ticks
+        then automatically pauses. Useful for step-by-step debugging.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ticks:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                  maximum: 100
+      responses:
+        '200':
+          description: Step complete, simulation paused
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimulationDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ── World ─────────────────────────────────────────────────────
+
+  /simulations/{sim_id}/world:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    get:
+      tags: [world]
+      operationId: getWorldState
+      summary: Get full world state snapshot
+      description: |
+        Returns the complete world snapshot at the current tick. This is the same structure
+        that is broadcast over WebSocket on each tick — suitable for initial page load.
+      parameters:
+        - in: query
+          name: tick
+          schema:
+            type: integer
+          description: |
+            If provided, returns the stored snapshot at that tick. Requires the snapshot
+            to exist in SQLite (controlled by snapshot_interval in SimConfig).
+      responses:
+        '200':
+          description: World snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorldSnapshot'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /simulations/{sim_id}/world/tiles/{x}/{y}:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+      - in: path
+        name: x
+        required: true
+        schema:
+          type: integer
+      - in: path
+        name: y
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [world]
+      operationId: getTile
+      summary: Get detailed state of a single tile
+      responses:
+        '200':
+          description: Tile detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TileDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /simulations/{sim_id}/world/resources:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    get:
+      tags: [world]
+      operationId: getResourceLayer
+      summary: Get resource layer as a flat map
+      description: Returns all resource nodes with their current levels indexed by tile coordinate.
+      responses:
+        '200':
+          description: Resource layer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tick:
+                    type: integer
+                  resources:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ResourceNode'
+
+  # ── Agents ────────────────────────────────────────────────────
+
+  /simulations/{sim_id}/agents:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    get:
+      tags: [agents]
+      operationId: listAgents
+      summary: List all agents in the simulation
+      parameters:
+        - in: query
+          name: faction_id
+          schema:
+            type: string
+          description: Filter by faction
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/AgentStatus'
+      responses:
+        '200':
+          description: Agent list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AgentSummary'
+
+  /simulations/{sim_id}/agents/{agent_id}:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+      - $ref: '#/components/parameters/AgentId'
+    get:
+      tags: [agents]
+      operationId: getAgent
+      summary: Get full agent detail
+      responses:
+        '200':
+          description: Agent detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /simulations/{sim_id}/agents/{agent_id}/memory:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+      - $ref: '#/components/parameters/AgentId'
+    get:
+      tags: [agents]
+      operationId: getAgentMemory
+      summary: Get agent memory stream
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+        - in: query
+          name: min_importance
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+          description: Filter to entries above this importance threshold
+        - in: query
+          name: query
+          schema:
+            type: string
+          description: Semantic search query — returns entries most relevant to this string
+      responses:
+        '200':
+          description: Memory entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agent_id:
+                    type: string
+                  tick:
+                    type: integer
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MemoryEntry'
+
+  /simulations/{sim_id}/agents/{agent_id}/plan:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+      - $ref: '#/components/parameters/AgentId'
+    get:
+      tags: [agents]
+      operationId: getAgentPlan
+      summary: Get agent's current cached plan
+      responses:
+        '200':
+          description: Current plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentPlan'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /simulations/{sim_id}/agents/{agent_id}/actions:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+      - $ref: '#/components/parameters/AgentId'
+    get:
+      tags: [agents]
+      operationId: getAgentActionHistory
+      summary: Get agent action history from the action log
+      parameters:
+        - in: query
+          name: from_tick
+          schema:
+            type: integer
+        - in: query
+          name: to_tick
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+      responses:
+        '200':
+          description: Action history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agent_id:
+                    type: string
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActionLogEntry'
+
+  /simulations/{sim_id}/agents/{agent_id}/llm-calls:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+      - $ref: '#/components/parameters/AgentId'
+    get:
+      tags: [agents]
+      operationId: getAgentLLMCalls
+      summary: Get raw LLM prompt/response log for an agent
+      parameters:
+        - in: query
+          name: module
+          schema:
+            $ref: '#/components/schemas/ModuleFlag'
+          description: Filter to a specific cognitive module
+        - in: query
+          name: from_tick
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: LLM call log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LLMCallEntry'
+
+  # ── Events ────────────────────────────────────────────────────
+
+  /simulations/{sim_id}/events:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+
+    get:
+      tags: [events]
+      operationId: listEvents
+      summary: List events that have fired in this simulation
+      parameters:
+        - in: query
+          name: from_tick
+          schema:
+            type: integer
+        - in: query
+          name: event_type
+          schema:
+            $ref: '#/components/schemas/EventType'
+        - in: query
+          name: source
+          schema:
+            type: string
+            enum: [god_mode, arbiter, environment, agent]
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Event list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SimEvent'
+
+    post:
+      tags: [events]
+      operationId: injectEvent
+      summary: Inject a structured event into the simulation
+      description: |
+        Queues the event for injection at the start of the next tick.
+        Simulation must be running or paused (not stopped).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InjectEventRequest'
+      responses:
+        '202':
+          description: Event queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id:
+                    type: string
+                  queued_for_tick:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /simulations/{sim_id}/god:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    post:
+      tags: [events]
+      operationId: godModeCommand
+      summary: Issue a natural language god-mode command
+      description: |
+        The NL string is resolved to a structured event via an LLM call using a constrained
+        tool schema. The resolved event is returned in the response for inspection before
+        it is queued. If `dry_run` is true the event is returned but not queued.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command:
+                  type: string
+                  example: "cause a severe drought in the northern third of the map"
+                dry_run:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Command resolved and queued (or dry-run result)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resolved_event:
+                    $ref: '#/components/schemas/SimEvent'
+                  queued:
+                    type: boolean
+                  queued_for_tick:
+                    type: integer
+                    nullable: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ── Ablation ──────────────────────────────────────────────────
+
+  /simulations/{sim_id}/ablation:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+
+    get:
+      tags: [ablation]
+      operationId: getAblationConfig
+      summary: Get current ablation configuration
+      responses:
+        '200':
+          description: Ablation config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AblationConfig'
+
+    put:
+      tags: [ablation]
+      operationId: setAblationConfig
+      summary: Replace the entire ablation configuration
+      description: |
+        Takes effect at the start of the next tick. The new config is versioned in SQLite
+        alongside a timestamp so experiment states are fully recoverable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AblationConfig'
+      responses:
+        '200':
+          description: Config applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AblationConfig'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /simulations/{sim_id}/ablation/flags:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    patch:
+      tags: [ablation]
+      operationId: patchAblationFlags
+      summary: Set individual ablation flags without replacing the entire config
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent_id:
+                  type: string
+                  nullable: true
+                  description: Null sets a global default for all agents
+                module:
+                  $ref: '#/components/schemas/ModuleFlag'
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Flag updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AblationConfig'
+
+  /simulations/{sim_id}/ablation/history:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    get:
+      tags: [ablation]
+      operationId: getAblationHistory
+      summary: Get versioned ablation config history for this simulation
+      responses:
+        '200':
+          description: Config history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        version:
+                          type: integer
+                        applied_at:
+                          type: string
+                          format: date-time
+                        config:
+                          $ref: '#/components/schemas/AblationConfig'
+
+  # ── Replay ────────────────────────────────────────────────────
+
+  /simulations/{sim_id}/replay/snapshots:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    get:
+      tags: [replay]
+      operationId: listSnapshots
+      summary: List available stored snapshots
+      description: |
+        Returns tick numbers for which a world snapshot exists in SQLite.
+        Snapshot frequency is controlled by `snapshot_interval` in SimConfig (default every tick).
+      responses:
+        '200':
+          description: Snapshot index
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sim_id:
+                    type: string
+                  snapshots:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        tick:
+                          type: integer
+                        created_at:
+                          type: string
+                          format: date-time
+                        size_bytes:
+                          type: integer
+
+  /simulations/{sim_id}/replay/seek:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    post:
+      tags: [replay]
+      operationId: seekReplay
+      summary: Restore simulation state to a stored tick snapshot
+      description: |
+        Rebuilds the Mesa model from the stored snapshot. Activates the mock LLM backend
+        using stored action log responses from that tick forward. Simulation status becomes
+        `paused`. Call /start to replay forward from that tick.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tick]
+              properties:
+                tick:
+                  type: integer
+      responses:
+        '200':
+          description: Seeked to tick
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sim_id:
+                    type: string
+                  tick:
+                    type: integer
+                  status:
+                    $ref: '#/components/schemas/SimStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /simulations/{sim_id}/replay/export:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    get:
+      tags: [replay]
+      operationId: exportReplay
+      summary: Export full action log as newline-delimited JSON
+      description: Streams the action log from tick 0 to current tick as NDJSON.
+      parameters:
+        - in: query
+          name: from_tick
+          schema:
+            type: integer
+            default: 0
+        - in: query
+          name: to_tick
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: NDJSON stream
+          content:
+            application/x-ndjson:
+              schema:
+                $ref: '#/components/schemas/ActionLogEntry'
+
+  # ── Stats ─────────────────────────────────────────────────────
+
+  /simulations/{sim_id}/stats:
+    parameters:
+      - $ref: '#/components/parameters/SimId'
+    get:
+      tags: [stats]
+      operationId: getStats
+      summary: Get simulation metrics
+      parameters:
+        - in: query
+          name: from_tick
+          schema:
+            type: integer
+        - in: query
+          name: to_tick
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Simulation metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimStats'
+
+# ─────────────────────────────────────────
+# WebSocket
+# ─────────────────────────────────────────
+#
+# ws://localhost:8000/ws/{sim_id}/tick
+#
+# Client → server messages:
+#   { "type": "subscribe", "sim_id": "..." }
+#   { "type": "unsubscribe" }
+#   { "type": "ping" }
+#
+# Server → client messages (all carry "tick" field):
+#   { "type": "snapshot",   "tick": N, "world": WorldSnapshot }       — on connect
+#   { "type": "tick_diff",  "tick": N, "diff": WorldDiff }            — each tick
+#   { "type": "sim_started","tick": N }
+#   { "type": "sim_paused", "tick": N, "reason": "..." | null }
+#   { "type": "sim_stopped","tick": N }
+#   { "type": "sim_error",  "tick": N, "error": "..." }
+#   { "type": "event",      "tick": N, "event": SimEvent }            — god/env events
+#   { "type": "pong" }
+
+# ─────────────────────────────────────────
+# Components
+# ─────────────────────────────────────────
+
+components:
+
+  parameters:
+    SimId:
+      in: path
+      name: sim_id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AgentId:
+      in: path
+      name: agent_id
+      required: true
+      schema:
+        type: string
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Operation not valid for current simulation state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Request body or query parameter validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    # ── Enums ─────────────────────────────────────────
+
+    SimStatus:
+      type: string
+      enum: [created, running, paused, stopped, error]
+
+    AgentStatus:
+      type: string
+      enum: [alive, dead, sleeping]
+
+    ModuleFlag:
+      type: string
+      enum: [perception, memory, reflection, planning, comms, tools]
+
+    BiomeType:
+      type: string
+      enum: [ocean, coast, plains, forest, desert, tundra, mountain, swamp]
+
+    ResourceType:
+      type: string
+      enum: [food, wood, stone, ore, water]
+
+    EventType:
+      type: string
+      enum: [weather, disaster, resource_spawn, agent_spawn, agent_kill,
+             faction_event, custom]
+
+    WeatherSubtype:
+      type: string
+      enum: [drought, flood, frost, abundance, storm]
+
+    StructureType:
+      type: string
+      enum: [shelter, farm, mine, wall, market, watchtower]
+
+    LLMBackendType:
+      type: string
+      enum: [anthropic, openai, mock]
+
+    # ── Primitives ────────────────────────────────────
+
+    TileCoord:
+      type: object
+      required: [x, y]
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+
+    TraitVector:
+      type: object
+      description: Agent personality traits, all values in [0, 1]
+      properties:
+        courage:
+          type: number
+          minimum: 0
+          maximum: 1
+        greed:
+          type: number
+          minimum: 0
+          maximum: 1
+        sociability:
+          type: number
+          minimum: 0
+          maximum: 1
+        aggression:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    ResourceBundle:
+      type: object
+      additionalProperties:
+        type: number
+      example:
+        food: 5.0
+        wood: 2.0
+
+    # ── Config schemas ────────────────────────────────
+
+    NoiseConfig:
+      type: object
+      properties:
+        octaves:
+          type: integer
+          default: 6
+        lacunarity:
+          type: number
+          default: 2.0
+        persistence:
+          type: number
+          default: 0.5
+        scale:
+          type: number
+          default: 100.0
+
+    WorldConfig:
+      type: object
+      required: [width, height]
+      properties:
+        width:
+          type: integer
+          minimum: 10
+          maximum: 256
+          default: 64
+        height:
+          type: integer
+          minimum: 10
+          maximum: 256
+          default: 64
+        terrain_noise:
+          $ref: '#/components/schemas/NoiseConfig'
+        moisture_noise:
+          $ref: '#/components/schemas/NoiseConfig'
+        sea_level:
+          type: number
+          default: 0.35
+          description: Height fraction below which tiles are ocean/coast
+        resource_density:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.4
+          description: Fraction of non-ocean tiles that have a resource node
+        weather_event_frequency:
+          type: number
+          default: 0.05
+          description: Probability of a weather event per tick
+
+    AgentConfig:
+      type: object
+      required: [name, faction_id]
+      properties:
+        name:
+          type: string
+        faction_id:
+          type: string
+        backstory:
+          type: string
+        traits:
+          $ref: '#/components/schemas/TraitVector'
+        starting_tile:
+          $ref: '#/components/schemas/TileCoord'
+          nullable: true
+          description: Null places the agent at a biome-appropriate random tile
+        llm_backend:
+          $ref: '#/components/schemas/LLMBackendType'
+          default: anthropic
+        llm_model:
+          type: string
+          nullable: true
+          description: Override model string for this agent's backend
+        memory_k:
+          type: integer
+          default: 20
+          description: Number of memories retrieved per step
+        reflection_interval:
+          type: integer
+          default: 5
+          description: Ticks between reflection runs
+        replan_interval:
+          type: integer
+          default: 3
+          description: Maximum ticks between re-plans (also re-plans on interrupt)
+        interrupt_threshold:
+          type: number
+          default: 0.7
+          description: Importance score above which an observation triggers immediate re-plan
+
+    SimConfig:
+      type: object
+      required: [name, world, agents]
+      properties:
+        name:
+          type: string
+        seed:
+          type: integer
+          nullable: true
+          description: Null generates a random seed
+        world:
+          $ref: '#/components/schemas/WorldConfig'
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentConfig'
+          minItems: 1
+          maxItems: 25
+        tick_interval_s:
+          type: number
+          default: 0
+          description: Seconds between ticks. 0 = maximum speed.
+        tick_timeout_s:
+          type: number
+          default: 30
+          description: Per-tick agent step timeout in seconds
+        snapshot_interval:
+          type: integer
+          default: 1
+          description: Store a world snapshot every N ticks. 1 = every tick.
+        ablation:
+          $ref: '#/components/schemas/AblationConfig'
+          nullable: true
+          description: Initial ablation configuration. Null enables all modules.
+
+    AblationConfig:
+      type: object
+      description: |
+        Ablation flags. Top-level keys are agent_id strings (or "__global__" for the default).
+        Each value is an object mapping ModuleFlag to bool.
+        Per-agent flags override the global default.
+      example:
+        __global__:
+          memory: true
+          reflection: true
+          planning: true
+          perception: true
+          comms: true
+          tools: true
+        agent_alice:
+          reflection: false
+
+    # ── Request bodies ────────────────────────────────
+
+    CreateSimulationRequest:
+      type: object
+      required: [config]
+      properties:
+        config:
+          $ref: '#/components/schemas/SimConfig'
+
+    InjectEventRequest:
+      type: object
+      required: [event_type]
+      properties:
+        event_type:
+          $ref: '#/components/schemas/EventType'
+        weather_subtype:
+          $ref: '#/components/schemas/WeatherSubtype'
+          nullable: true
+        affected_tiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/TileCoord'
+          description: Leave null to affect the whole map
+          nullable: true
+        affected_agents:
+          type: array
+          items:
+            type: string
+          description: Agent ids — used for agent_spawn / agent_kill events
+          nullable: true
+        duration_ticks:
+          type: integer
+          nullable: true
+          description: How long the event persists (weather events)
+        resource_type:
+          $ref: '#/components/schemas/ResourceType'
+          nullable: true
+        resource_amount:
+          type: number
+          nullable: true
+        custom_payload:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    # ── Response schemas ──────────────────────────────
+
+    SimulationSummary:
+      type: object
+      properties:
+        sim_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/SimStatus'
+        tick:
+          type: integer
+        seed:
+          type: integer
+        agent_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SimulationDetail:
+      allOf:
+        - $ref: '#/components/schemas/SimulationSummary'
+        - type: object
+          properties:
+            config:
+              $ref: '#/components/schemas/SimConfig'
+            error_log:
+              type: string
+              nullable: true
+            ablation:
+              $ref: '#/components/schemas/AblationConfig'
+
+    TileInfo:
+      type: object
+      properties:
+        coord:
+          $ref: '#/components/schemas/TileCoord'
+        height:
+          type: number
+        moisture:
+          type: number
+        biome:
+          $ref: '#/components/schemas/BiomeType'
+        structure:
+          $ref: '#/components/schemas/StructureType'
+          nullable: true
+        agent_ids:
+          type: array
+          items:
+            type: string
+
+    TileDetail:
+      allOf:
+        - $ref: '#/components/schemas/TileInfo'
+        - type: object
+          properties:
+            resources:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResourceNode'
+            events_this_tick:
+              type: array
+              items:
+                $ref: '#/components/schemas/SimEvent'
+
+    ResourceNode:
+      type: object
+      properties:
+        tile:
+          $ref: '#/components/schemas/TileCoord'
+        resource_type:
+          $ref: '#/components/schemas/ResourceType'
+        current_level:
+          type: number
+        max_level:
+          type: number
+        regen_rate:
+          type: number
+        weather_modifier:
+          type: number
+          description: Current multiplier on regen_rate from active weather effects
+
+    WorldSnapshot:
+      type: object
+      properties:
+        sim_id:
+          type: string
+        tick:
+          type: integer
+        width:
+          type: integer
+        height:
+          type: integer
+        tiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/TileInfo'
+          description: Row-major, length = width × height
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceNode'
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentSummary'
+        active_weather:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimEvent'
+        created_at:
+          type: string
+          format: date-time
+
+    WorldDiff:
+      type: object
+      description: Minimal diff broadcast over WebSocket each tick
+      properties:
+        tick:
+          type: integer
+        changed_tiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/TileInfo'
+        changed_resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResourceNode'
+        agent_updates:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentSummary'
+        new_events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SimEvent'
+
+    AgentSummary:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        name:
+          type: string
+        faction_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/AgentStatus'
+        tile:
+          $ref: '#/components/schemas/TileCoord'
+        health:
+          type: number
+          minimum: 0
+          maximum: 1
+        resources:
+          $ref: '#/components/schemas/ResourceBundle'
+        last_action:
+          type: string
+          nullable: true
+
+    AgentDetail:
+      allOf:
+        - $ref: '#/components/schemas/AgentSummary'
+        - type: object
+          properties:
+            identity:
+              type: object
+              properties:
+                backstory:
+                  type: string
+                traits:
+                  $ref: '#/components/schemas/TraitVector'
+            memory_entry_count:
+              type: integer
+            current_plan:
+              $ref: '#/components/schemas/AgentPlan'
+            ablation_flags:
+              type: object
+              additionalProperties:
+                type: boolean
+
+    MemoryEntry:
+      type: object
+      properties:
+        entry_id:
+          type: string
+        tick:
+          type: integer
+        content:
+          type: string
+        importance:
+          type: number
+          minimum: 0
+          maximum: 1
+        entry_type:
+          type: string
+          enum: [observation, reflection, message]
+        recency_score:
+          type: number
+
+    AgentPlan:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        tick_created:
+          type: integer
+        goal:
+          type: string
+        steps:
+          type: array
+          items:
+            type: object
+            properties:
+              index:
+                type: integer
+              tool:
+                type: string
+              args:
+                type: object
+                additionalProperties: true
+              status:
+                type: string
+                enum: [pending, completed, failed, skipped]
+        current_step_index:
+          type: integer
+
+    ActionLogEntry:
+      type: object
+      properties:
+        sim_id:
+          type: string
+        tick:
+          type: integer
+        agent_id:
+          type: string
+        module:
+          type: string
+        action_type:
+          type: string
+        action_json:
+          type: object
+          additionalProperties: true
+        duration_ms:
+          type: integer
+
+    LLMCallEntry:
+      type: object
+      properties:
+        tick:
+          type: integer
+        agent_id:
+          type: string
+        module:
+          $ref: '#/components/schemas/ModuleFlag'
+        system_prompt:
+          type: string
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, assistant]
+              content:
+                type: string
+        response:
+          type: string
+        input_tokens:
+          type: integer
+        output_tokens:
+          type: integer
+        latency_ms:
+          type: integer
+
+    SimEvent:
+      type: object
+      properties:
+        event_id:
+          type: string
+        sim_id:
+          type: string
+        tick:
+          type: integer
+        source:
+          type: string
+          enum: [god_mode, arbiter, environment, agent]
+        event_type:
+          $ref: '#/components/schemas/EventType'
+        payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
+    SimStats:
+      type: object
+      properties:
+        sim_id:
+          type: string
+        tick_range:
+          type: object
+          properties:
+            from_tick:
+              type: integer
+            to_tick:
+              type: integer
+        total_ticks:
+          type: integer
+        avg_tick_duration_ms:
+          type: number
+        p95_tick_duration_ms:
+          type: number
+        total_input_tokens:
+          type: integer
+        total_output_tokens:
+          type: integer
+        estimated_cost_usd:
+          type: number
+        per_agent:
+          type: array
+          items:
+            type: object
+            properties:
+              agent_id:
+                type: string
+              total_actions:
+                type: integer
+              llm_calls:
+                type: integer
+              input_tokens:
+                type: integer
+              output_tokens:
+                type: integer
+              noops:
+                type: integer
+              llm_errors:
+                type: integer
+
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+          example: sim_not_found
+        message:
+          type: string
+          description: Human-readable description
+          example: "Simulation abc123 does not exist"
+        detail:
+          type: object
+          additionalProperties: true
+          nullable: true

@@ -9,10 +9,11 @@ from pynoise.noiseutil import (
 from environment.winds import Winds
 from random import randint
 from environment.rainfall import generate_rainfall_patterns
+from environment.tiles import Tile
 
 
 class Map(OrthogonalMooreGrid):
-    def __init__(self, dimensions, torus, capacity, random=None, cell_klass=0):
+    def __init__(self, dimensions, torus, capacity, random=None, cell_klass=Tile):
         if random is None:
             random = randint(0, 100000)
         """<Up> self,
@@ -21,7 +22,7 @@ class Map(OrthogonalMooreGrid):
         capacity: float | None = None,  #how many cells
         random: Random | None = None,   #seed
         cell_klass: type[T] = Cell,"""  # cells
-        super().__init__(dimensions, torus, capacity, random)
+        super().__init__(dimensions, torus, capacity, random, cell_klass)
 
     def create_biomes(self, wind: Winds):
         perlin = Perlin(2, seed=self.random)
@@ -29,9 +30,9 @@ class Map(OrthogonalMooreGrid):
             width=self.dimensions[0],
             height=self.dimensions[1],
             lower_x=1,
-            upper_x=3,
+            upper_x=2,
             lower_z=1,
-            upper_z=3,
+            upper_z=2,
             source=perlin,
         ).reshape(self.dimensions)
         rainfall = generate_rainfall_patterns(elevation, wind)
