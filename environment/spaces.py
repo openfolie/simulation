@@ -11,13 +11,13 @@ from random import randint
 from environment.rainfall import generate_rainfall_patterns
 from environment.tiles import Tile
 import numpy as np
-np.set_printoptions(
-    threshold=np.inf,      # show all elements
-    precision=1,           # decimal places
-    suppress=True,         # suppress scientific notation like 1e-5
-    linewidth=200          # wider lines before wrapping
-)
 
+np.set_printoptions(
+    threshold=np.inf,  # show all elements
+    precision=1,  # decimal places
+    suppress=True,  # suppress scientific notation like 1e-5
+    linewidth=200,  # wider lines before wrapping
+)
 
 
 class Map(OrthogonalMooreGrid):
@@ -32,7 +32,6 @@ class Map(OrthogonalMooreGrid):
         cell_klass: type[T] = Cell,"""  # cells
         super().__init__(dimensions, torus, capacity, random, cell_klass)
 
-
     def create_biomes(self, wind: Winds):
         perlin = Perlin(2, seed=self.random)
         elevation = noise_map_plane(
@@ -44,10 +43,11 @@ class Map(OrthogonalMooreGrid):
             upper_z=2,
             source=perlin,
         ).reshape(self.dimensions)
-        
 
         for tile in self.all_cells:
-            tile.elevation = elevation[tile.coordinate]  # coord is (x, y), direct numpy index
+            tile.elevation = elevation[
+                tile.coordinate
+            ]  # coord is (x, y), direct numpy index
 
         rainfall = generate_rainfall_patterns(elevation, wind)
 
@@ -67,9 +67,11 @@ class Map(OrthogonalMooreGrid):
             grayscale_gradient(),
         )
 
-    def displayCell(self,n):  # helper functino checking mapping consistency with the map 
+    def displayCell(
+        self, n
+    ):  # helper functino checking mapping consistency with the map
         arr = np.array([cell.elevation for cell in self.all_cells])
-        for i in range(0,256,n):
-            for j in range(0,256,n):
-                print(round(arr[i],2) ,end = " ")
+        for i in range(0, 256, n):
+            for j in range(0, 256, n):
+                print(round(arr[i], 2), end=" ")
             print("\n")

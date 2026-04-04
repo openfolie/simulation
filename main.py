@@ -7,5 +7,6 @@ def main():
     maps.create_biomes(wind)
     maps.displayCell(8)
 
+
 if __name__ == "__main__":
     main()
