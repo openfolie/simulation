@@ -17,8 +17,10 @@ class OnlyEastwardWinds(Winds):
 
     def get_wind(self, x, y):
         x, y = int(x), int(y)
-        assert 0 <= x < self.width and 0 <= y < self.height
-        return self.data[x][y]
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return self.data[x][y]
+        else:
+            return 0
 
 
 class OnlyWestwardWinds(Winds):

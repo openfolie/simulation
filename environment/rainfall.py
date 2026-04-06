@@ -2,10 +2,7 @@ import numpy as np
 from math import sin, cos
 from environment.winds import Winds
 from scipy.ndimage import gaussian_filter
-# from multiprocessing import Pool
-from concurrent.futures import ThreadPoolExecutor
-
-# import pygame
+from random import randrange
 
 
 FPS = 60
@@ -94,9 +91,7 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
     particles = list(map(lambda x: Particle(x, elevation.shape), particles))
     iters = 0
 
-    # pygame.init()
-    # screen = pygame.display.set_mode(elevation.shape)
-    ITER_COUNT = 1000
+    ITER_COUNT = 2000
     while iters < ITER_COUNT:
         if iters % 20 == 0:
             print(
@@ -106,16 +101,13 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
             )
         iters += 1
 
-        # screen.fill((0, 0, 0))
-
-        # for p in particles:
         def process_particle(p):
             elevationbelow = elevation[int(p.y)][int(p.x)]
             if elevationbelow < -0.04:
                 p.moisture -= elevationbelow * 2
                 p.moisture = max(10, p.moisture)
             else:
-                p.moisture = max(0, p.moisture - 0.5)
+                p.moisture = max(0, p.moisture - randrange(0, 5)/10)
 
             px, py = int(p.x), int(p.y)
             dpdx = (density[py][min(255, px + 1)] - density[py][max(0, px - 1)]) / 2
@@ -132,40 +124,17 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
             if elevationbelow > 0.75:
                 p.velocity_x *= -1
                 p.velocity_y *= -1
-            # pygame.draw.circle(screen, (0, 0, 255), (p.x, p.y), 1)
             p.tick()
 
             density[py][px] -= 1
             density[int(p.y)][int(p.x)] += 1
+            rainfall[py][px] += p.moisture
 
-            # rainfall[py][px] += p.moisture
-            # return p
-        # pygame.display.flip()
-
-        with ThreadPoolExecutor() as pool:
-            pool.map(process_particle, particles)
+        for p in particles:
+            process_particle(p)
 
     std = np.std(rainfall)
     rainfall = np.clip(rainfall / std, 0, np.mean(rainfall) + 3 * std)
     rainfall = gaussian_filter(rainfall, sigma=2)
 
-    # flat = rainfall.flatten()
-    # colors = np.array([(0, 0, x) for x in flat])
-    #
-    # rgb = colors.reshape(rainfall.shape[0], rainfall.shape[1], 3)
-    # rgb = (rgb * 255).astype(np.uint8)
-    # rgb = np.transpose(rgb, (1, 0, 2))
-    #
-    # background = pygame.surfarray.make_surface(rgb)
-    # running = True
-    #
-    # while running:
-    #     for event in pygame.event.get():
-    #         if event.type == pygame.QUIT:
-    #             running = False
-    #
-    #     screen.blit(background, (0, 0))
-    #     pygame.display.flip()
-
-    # pygame.quit()
     return rainfall
