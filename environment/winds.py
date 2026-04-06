@@ -6,9 +6,6 @@ class Winds:
     def get_wind(self, x, y):
         raise NotImplementedError
 
-    def get_starting_points(self):
-        raise NotImplementedError
-
 
 class OnlyEastwardWinds(Winds):
     def __init__(self, width, height):
@@ -23,12 +20,6 @@ class OnlyEastwardWinds(Winds):
         assert 0 <= x < self.width and 0 <= y < self.height
         return self.data[x][y]
 
-    def get_starting_points(self):
-        output = []
-        for i in range(self.height):
-            output.append((0, i))
-        return output
-
 
 class OnlyWestwardWinds(Winds):
     def __init__(self, width, height):
@@ -38,14 +29,10 @@ class OnlyWestwardWinds(Winds):
 
     def get_wind(self, x, y):
         x, y = int(x), int(y)
-        assert 0 <= x < self.width and 0 <= y < self.height
-        return self.data[x][y]
-
-    def get_starting_points(self):
-        output = []
-        for i in range(self.height):
-            output.append((self.width - 1, i))
-        return output
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return self.data[x][y]
+        else:
+            return 0
 
 
 class OnlyNorthwardWinds(Winds):
@@ -58,14 +45,10 @@ class OnlyNorthwardWinds(Winds):
 
     def get_wind(self, x, y):
         x, y = int(x), int(y)
-        assert 0 <= x < self.width and 0 <= y < self.height
-        return self.data[x][y]
-
-    def get_starting_points(self):
-        output = []
-        for i in range(self.height):
-            output.append((i, 0))
-        return output
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return self.data[x][y]
+        else:
+            return 0
 
 
 class OnlySouthwardWinds(Winds):
@@ -76,11 +59,7 @@ class OnlySouthwardWinds(Winds):
 
     def get_wind(self, x, y):
         x, y = int(x), int(y)
-        assert 0 <= x < self.width and 0 <= y < self.height
-        return self.data[x][y]
-
-    def get_starting_points(self):
-        output = []
-        for i in range(self.height):
-            output.append((i, self.height - 1))
-        return output
+        if 0 <= x < self.width and 0 <= y < self.height:
+            return self.data[x][y]
+        else:
+            return 0
