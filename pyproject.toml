@@ -25,6 +25,9 @@ dev = [
 addopts = [
     "--ignore=opt",
 ]
+testpaths = [
+    "tests"
+]
 pythonpath = ["."]
 
 [tool.uv.workspace]
