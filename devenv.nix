@@ -18,7 +18,7 @@
   ];
   languages.python.enable = true;
   env = {
-    LD_LIBRARY_PATH = "/run/opengl-driver/lib";
+    LD_LIBRARY_PATH = "/run/opengl-driver/lib:/run/opengl-driver-32/lib";
     OCL_ICD_VENDORS = "/run/opengl-driver/etc/OpenCL/vendors";
     SDL_VIDEODRIVER = "wayland";
     LIBGL_DRIVERS_PATH = "${pkgs.mesa.drivers}/lib/dri";

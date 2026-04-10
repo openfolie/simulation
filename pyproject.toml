@@ -34,8 +34,8 @@ pythonpath = ["."]
 members = ["packages/*"]
 
 [tool.uv.sources]
-mesa = { workspace = true }
 pynoise = { workspace = true }
+mesa = { workspace = true }
 
 [tool.setuptools]
 packages = []
