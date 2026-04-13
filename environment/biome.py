@@ -19,27 +19,39 @@ class MaterialInfo:
 
 
 class BiomeBlueprint(ABC):
-    def __init__(self, elevation, temperature, rainfall): pass
+    def __init__(self, elevation, temperature, rainfall):
+        pass
 
     @abstractmethod
-    def get_spawnable_materials(self) -> List[MaterialInfo]: pass
+    def get_spawnable_materials(self) -> List[MaterialInfo]:
+        pass
 
 
 class HotDesertBlueprint(BiomeBlueprint):
     def get_spawnable_materials(self):
-        return list(map(lambda x: MaterialInfo(*x), [
-            (Material.SAND, 1.0),
-            (Material.GOLD, 0.04),
-        ]))
+        return list(
+            map(
+                lambda x: MaterialInfo(*x),
+                [
+                    (Material.SAND, 1.0),
+                    (Material.GOLD, 0.04),
+                ],
+            )
+        )
 
 
 class ForestBlueprint(BiomeBlueprint):
     def get_spawnable_materials(self):
-        return list(map(lambda x: MaterialInfo(*x), [
-            (Material.DIRT, 1.0),
-            (Material.WOOD, 0.89),
-            (Material.IRON, 0.08),
-        ]))
+        return list(
+            map(
+                lambda x: MaterialInfo(*x),
+                [
+                    (Material.DIRT, 1.0),
+                    (Material.WOOD, 0.89),
+                    (Material.IRON, 0.08),
+                ],
+            )
+        )
 
 
 def biome_blueprint_factory(elevation, temperature, rainfall):

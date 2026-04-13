@@ -3,6 +3,7 @@ from math import sin, cos
 from environment.winds import Winds
 from scipy.ndimage import gaussian_filter
 from random import randrange
+from tqdm import tqdm
 
 
 FPS = 60
@@ -89,25 +90,16 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
             density[j][i] += 1
 
     particles = list(map(lambda x: Particle(x, elevation.shape), particles))
-    iters = 0
 
-    ITER_COUNT = 2000
-    while iters < ITER_COUNT:
-        if iters % 20 == 0:
-            print(
-                "Simulating rainfall:",
-                round(100 * iters / ITER_COUNT, 2),
-                "% completed",
-            )
-        iters += 1
+    for _ in tqdm(range(2000), desc="Generating Rainfall"):
 
         def process_particle(p):
             elevationbelow = elevation[int(p.y)][int(p.x)]
-            if elevationbelow < -0.04:
-                p.moisture -= elevationbelow * 2
+            if elevationbelow < 0.4:
+                p.moisture += elevationbelow * 0.2
                 p.moisture = max(10, p.moisture)
             else:
-                p.moisture = max(0, p.moisture - randrange(0, 5)/10)
+                p.moisture = max(0, p.moisture - randrange(0, 5) / 10)
 
             px, py = int(p.x), int(p.y)
             dpdx = (density[py][min(255, px + 1)] - density[py][max(0, px - 1)]) / 2

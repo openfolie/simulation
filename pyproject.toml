@@ -8,11 +8,10 @@ dependencies = [
     "black>=26.3.1",
     "mesa",
     "networkx>=3.6.1",
-    "pynoise",
-    "pyopencl>=2026.1.2",
+    "noise>=1.2.2",
     "scipy>=1.17.1",
     "seaborn>=0.13.2",
-    "sortedcontainers>=2.4.0",
+    "tqdm>=4.67.3",
 ]
 
 [dependency-groups]
@@ -34,7 +33,6 @@ pythonpath = ["."]
 members = ["packages/*"]
 
 [tool.uv.sources]
-pynoise = { workspace = true }
 mesa = { workspace = true }
 
 [tool.setuptools]

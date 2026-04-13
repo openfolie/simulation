@@ -7,18 +7,18 @@ def wind_factory(wind_str):
 
 
 def main():
-    config = load_config()
+    config = load_config("configuration/world.nix")
     print(config)
     maps = spaces.Map(
-        config['map']['size'],
+        config["map"]["size"],
         False,
-        config['map']['cellcapacity'],
-        config['map']['seed']
+        config["map"]["cellcapacity"],
+        config["map"]["seed"],
     )
-    Wind = wind_factory(config['map']['wind'])
-    wind = Wind(*config['map']['size'])
+    Wind = wind_factory(config["map"]["wind"])
+    wind = Wind(*config["map"]["size"])
     maps.create_biomes(wind)
-    maps.displayCell(8)
+    # maps.displayCell(8)
 
 
 if __name__ == "__main__":

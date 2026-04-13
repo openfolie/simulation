@@ -10,5 +10,4 @@ __pycache__
 .trash
 .obsidian
 *.egg-info
-terrain.png
-rainfall.png
+*.png
