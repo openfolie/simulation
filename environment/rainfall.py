@@ -1,7 +1,7 @@
 import numpy as np
 from math import sin, cos
 from environment.winds import Winds
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, uniform_filter
 from random import randrange
 from tqdm import tqdm
 
@@ -77,11 +77,20 @@ def splat(density: np.array, x, y, weight):
         density[y0 + 1][x0 + 1] += weight * tx * ty
 
 
+OCEAN_LEVEL = 0.4
+CLOUD_LEVEL = 0.6
+MOISTURE_FILLUP_RATE = 1
+MAX_MOISTURE = 10
+MOISTURE_DROP_RATE = 0.2
+WIND_SPEED = 200
+DRAG = 0.1
+
+
 def generate_rainfall_patterns(elevation: np.array, wind: Winds):
     rainfall = np.zeros(elevation.shape)
     particles = []
     density = np.zeros(elevation.shape)
-    SPARCITY = 5
+    SPARCITY = 3
     rho = 1
 
     for i in range(0, elevation.shape[0], SPARCITY):
@@ -91,31 +100,37 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
 
     particles = list(map(lambda x: Particle(x, elevation.shape), particles))
 
-    for _ in tqdm(range(2000), desc="Generating Rainfall"):
+    for _ in tqdm(range(300), desc="Generating Rainfall"):
 
         def process_particle(p):
-            elevationbelow = elevation[int(p.y)][int(p.x)]
-            if elevationbelow < 0.4:
-                p.moisture += elevationbelow * 0.2
-                p.moisture = max(10, p.moisture)
-            else:
-                p.moisture = max(0, p.moisture - randrange(0, 5) / 10)
-
             px, py = int(p.x), int(p.y)
+            elevationbelow = elevation[py][px]
+            if elevationbelow < OCEAN_LEVEL:
+                p.moisture += (OCEAN_LEVEL - elevationbelow) * MOISTURE_FILLUP_RATE / OCEAN_LEVEL
+                p.moisture = max(MAX_MOISTURE, p.moisture)
+            else:
+                p.moisture = max(
+                    0,
+                    p.moisture - randrange(
+                        0,
+                        round(MAX_MOISTURE * MOISTURE_DROP_RATE)
+                    ) / MAX_MOISTURE
+                )
+
             dpdx = (density[py][min(255, px + 1)] - density[py][max(0, px - 1)]) / 2
             dpdy = (density[min(255, py + 1)][px] - density[max(0, py - 1)][px]) / 2
 
             p.velocity_x -= (dpdx / rho) * DT
             p.velocity_y -= (dpdy / rho) * DT
 
-            wind_dir = 20 * sample_bilinear(wind, p.x, p.y)
-            drag = 0.1
-            p.velocity_x += (wind_dir[0] - p.velocity_x) * drag * DT
-            p.velocity_y += (wind_dir[1] - p.velocity_y) * drag * DT
+            wind_dir = WIND_SPEED * sample_bilinear(wind, p.x, p.y)
+            p.velocity_x += (wind_dir[0] - p.velocity_x) * DRAG * DT
+            p.velocity_y += (wind_dir[1] - p.velocity_y) * DRAG * DT
 
-            if elevationbelow > 0.75:
+            if elevationbelow > CLOUD_LEVEL:
                 p.velocity_x *= -1
                 p.velocity_y *= -1
+
             p.tick()
 
             density[py][px] -= 1
@@ -126,7 +141,8 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
             process_particle(p)
 
     std = np.std(rainfall)
+    og_rainfall = np.copy(rainfall)
     rainfall = np.clip(rainfall / std, 0, np.mean(rainfall) + 3 * std)
-    rainfall = gaussian_filter(rainfall, sigma=2)
+    rainfall = gaussian_filter(rainfall, sigma=3)
 
-    return rainfall
+    return rainfall, og_rainfall

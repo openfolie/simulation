@@ -1,14 +1,17 @@
 from environment import spaces, winds
 from configuration import load_config
+import time
 
 
 def wind_factory(wind_str):
-    return winds.OnlySouthwardWinds
+    return winds.OnlyWestwardWinds
 
 
 def main():
+    start = time.time()
     config = load_config("configuration/world.nix")
-    print(config)
+    end = time.time()
+    print(config, end - start)
     maps = spaces.Map(
         config["map"]["size"],
         False,

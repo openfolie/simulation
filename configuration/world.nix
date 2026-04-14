@@ -1,6 +1,6 @@
 {
   map = {
-    seed = 2;
+    seed = 3;
     size = [ 256 256 ];
     cellcapacity = 400;
     wind = "south";
