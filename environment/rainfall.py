@@ -106,15 +106,16 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
             px, py = int(p.x), int(p.y)
             elevationbelow = elevation[py][px]
             if elevationbelow < OCEAN_LEVEL:
-                p.moisture += (OCEAN_LEVEL - elevationbelow) * MOISTURE_FILLUP_RATE / OCEAN_LEVEL
+                p.moisture += (
+                    (OCEAN_LEVEL - elevationbelow) * MOISTURE_FILLUP_RATE / OCEAN_LEVEL
+                )
                 p.moisture = max(MAX_MOISTURE, p.moisture)
             else:
                 p.moisture = max(
                     0,
-                    p.moisture - randrange(
-                        0,
-                        round(MAX_MOISTURE * MOISTURE_DROP_RATE)
-                    ) / MAX_MOISTURE
+                    p.moisture
+                    - randrange(0, round(MAX_MOISTURE * MOISTURE_DROP_RATE))
+                    / MAX_MOISTURE,
                 )
 
             dpdx = (density[py][min(255, px + 1)] - density[py][max(0, px - 1)]) / 2

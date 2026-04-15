@@ -3,7 +3,7 @@
     seed = 3;
     size = [ 256 256 ];
     cellcapacity = 400;
-    wind = "south";
+    wind = "clockwise";
   };
   materials = [ "sand" "dirt" "wood" "coal" "gold" ];
   biomes = [

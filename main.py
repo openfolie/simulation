@@ -3,10 +3,6 @@ from configuration import load_config
 import time
 
 
-def wind_factory(wind_str):
-    return winds.OnlyWestwardWinds
-
-
 def main():
     start = time.time()
     config = load_config("configuration/world.nix")
@@ -18,7 +14,7 @@ def main():
         config["map"]["cellcapacity"],
         config["map"]["seed"],
     )
-    Wind = wind_factory(config["map"]["wind"])
+    Wind = winds.from_config(config["map"]["wind"])
     wind = Wind(*config["map"]["size"])
     maps.create_biomes(wind)
     # maps.displayCell(8)

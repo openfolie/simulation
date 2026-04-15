@@ -4,6 +4,7 @@ with lib;
 
 let
   cfg = config.world;
+  validWinds = ["north" "south" "east" "west" "clockwise" "anticlockwise"];
   materialSet = builtins.listToAttrs (map (m: { name = m; value = true; }) cfg.materials);
 in {
   options.world = {
@@ -27,9 +28,9 @@ in {
           wind = mkOption {
             type = types.str;
             apply = v:
-              if builtins.elem v ["north" "south" "east" "west"]
+              if builtins.elem v validWinds 
               then v
-              else throw "Invalid map wind set, expected one of {north, south, east, west}. Got ${v}";
+              else throw "Invalid map wind set, expected one of {${builtins.concatStringsSep ", " validWinds}}. Got ${v}";
           };
         };
       };
