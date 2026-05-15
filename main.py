@@ -16,7 +16,7 @@ def main():
     )
     Wind = winds.from_config(config["map"]["wind"])
     wind = Wind(*config["map"]["size"])
-    maps.create_biomes(wind)
+    maps.create_biomes(wind, config["biomes"])
     # maps.displayCell(8)
 
 

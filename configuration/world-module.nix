@@ -45,9 +45,29 @@ in {
           materials = mkOption {
             type = types.listOf types.str;
           };
-          elevation = range number;
-          rainfall = range number;
-          temperature = range types.int;
+          points = mkOption {
+            type = types.listOf (types.listOf types.int);
+
+            apply = points:
+              map
+                (v:
+                  if builtins.length v != 3 then
+                    throw "point needs elevation, rainfall, temperature"
+
+                  else if !(builtins.elemAt v 0 >= 0 && builtins.elemAt v 0 <= 8000) then
+                    throw "elevation needs to be between 0 and 8000"
+
+                  else if !(builtins.elemAt v 1 >= 0 && builtins.elemAt v 1 <= 100) then
+                    throw "rainfall needs to be between 0 and 100"
+
+                  else if builtins.elemAt v 2 < 0 then
+                    throw "temperature needs to be positive"
+
+                  else
+                    v
+                )
+                points;
+          };
         };
       }));
     };
