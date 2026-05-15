@@ -39,11 +39,10 @@ class Map(OrthogonalMooreGrid):
         for tile in self.all_cells:
             tile.elevation = elevation[tile.coordinate]
 
-        rainfall, og = generate_rainfall_patterns(elevation, wind)
+        rainfall = generate_rainfall_patterns(elevation, wind)
 
-        save_3dnoise_image(grayscale_to_color(elevation), "elevation.png")
-        save_noise_image(rainfall, "rainfall.png")
-        save_noise_image(og, "rainfallog.png")
+        save_3dnoise_image(grayscale_to_color(elevation), "imgs/elevation.png")
+        save_noise_image(rainfall, "imgs/rainfall.png")
 
     def displayCell(
         self, n

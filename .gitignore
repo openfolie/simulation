@@ -11,3 +11,4 @@ __pycache__
 .obsidian
 *.egg-info
 *.png
+temp

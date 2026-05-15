@@ -1,7 +1,7 @@
 import numpy as np
 from math import sin, cos
 from environment.winds import Winds
-from scipy.ndimage import gaussian_filter, uniform_filter
+from scipy.ndimage import gaussian_filter
 from random import randrange
 from tqdm import tqdm
 
@@ -83,7 +83,7 @@ MOISTURE_FILLUP_RATE = 1
 MAX_MOISTURE = 10
 MOISTURE_DROP_RATE = 0.2
 WIND_SPEED = 200
-DRAG = 0.1
+DRAG = 1
 
 
 def generate_rainfall_patterns(elevation: np.array, wind: Winds):
@@ -141,9 +141,8 @@ def generate_rainfall_patterns(elevation: np.array, wind: Winds):
         for p in particles:
             process_particle(p)
 
-    std = np.std(rainfall)
-    og_rainfall = np.copy(rainfall)
-    rainfall = np.clip(rainfall / std, 0, np.mean(rainfall) + 3 * std)
-    rainfall = gaussian_filter(rainfall, sigma=3)
+    rainfall = np.log(1 + rainfall)
+    rainfall = rainfall / np.max(rainfall)
+    rainfall = gaussian_filter(rainfall, sigma=1)
 
-    return rainfall, og_rainfall
+    return rainfall

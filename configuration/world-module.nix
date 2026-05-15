@@ -4,33 +4,33 @@ with lib;
 
 let
   cfg = config.world;
-  validWinds = ["north" "south" "east" "west" "clockwise" "anticlockwise"];
   materialSet = builtins.listToAttrs (map (m: { name = m; value = true; }) cfg.materials);
+  number = types.either types.int types.float;
+  range = t: mkOption {
+    type = types.listOf t;
+
+    apply = v:
+      if builtins.length v == 2
+      then v
+      else throw "range must contain exactly 2 entries";
+  };
 in {
   options.world = {
     map = mkOption {
       type = types.submodule {
         options = {
           seed = mkOption {
-            type = types.int;
+            type = number;
           };
-          size = mkOption {
-            type = types.listOf types.int;
-
-            apply = v:
-              if builtins.length v == 2
-              then v
-              else throw "map.size must contain exactly 2 integers";
-          };
+          size = range types.int;
           cellcapacity = mkOption {
             type = types.int;
           };
           wind = mkOption {
-            type = types.str;
-            apply = v:
-              if builtins.elem v validWinds 
-              then v
-              else throw "Invalid map wind set, expected one of {${builtins.concatStringsSep ", " validWinds}}. Got ${v}";
+            type = types.enum [
+              "north" "south" "east" "west"
+              "clockwise" "anticlockwise"
+            ];
           };
         };
       };
@@ -40,17 +40,16 @@ in {
     };
 
     biomes = mkOption {
-      type = types.listOf (types.submodule {
+      type = types.attrsOf (types.submodule ({ ... }: {
         options = {
-          name = mkOption {
-            type = types.str;
-          };
-
           materials = mkOption {
             type = types.listOf types.str;
           };
+          elevation = range number;
+          rainfall = range number;
+          temperature = range types.int;
         };
-      });
+      }));
     };
   };
 
@@ -60,7 +59,7 @@ in {
         builtins.all (m:
           builtins.hasAttr m materialSet
         ) biome.materials
-      ) cfg.biomes;
+      ) (builtins.attrValues cfg.biomes);
   in
   {
     _module.check =

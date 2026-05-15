@@ -1,7 +1,5 @@
 import subprocess
 import json
-import string
-import random
 
 EVAL_FILE_CONTENT = """
 let
@@ -18,10 +16,6 @@ let
 in
 result.config.world
 """
-
-
-def random_str():
-    return "".join(random.choices(string.ascii_letters, k=32))
 
 
 def load_config(file_name):
